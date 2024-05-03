@@ -6,11 +6,11 @@
   tags:
     - database_servers
   vars:
-    postgres_rhel7_repo: "https://download.postgresql.org/pub/repos/yum/10/redhat/rhel-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+    postgres_rhel7_repo: https://download.postgresql.org/pub/repos/yum/10/redhat/rhel-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
     postgres_packages:
-      - postgresql10 
-      - postgresql10-server 
-      - postgresql10-contrib 
+      - postgresql10
+      - postgresql10-server
+      - postgresql10-contrib
       - postgresql10-libs
     postgres_library: python-psycopg2
     postgres_10_data_dir: /var/lib/pgsql/10/data
@@ -31,13 +31,12 @@
         owner: flask
 
   tasks:
-
     - name: Install Postgres packages
       package:
         name: "{{ __package }}"
         state: present
-      loop: 
-        - "{{ postgres_rhel7_repo }}"        
+      loop:
+        - "{{ postgres_rhel7_repo }}"
         - "{{ postgres_packages }}"
         - "{{ postgres_library }}"
       loop_control:
@@ -62,7 +61,7 @@
     - name: Setup Postgres to listen on network interfaces
       lineinfile:
         dest: "{{ postgres_10_data_dir }}/postgresql.conf"
-        line: "listen_addresses = '*'"
+        line: listen_addresses = '*'
         insertafter: "#listen_addresses"
       notify: restart_postgres
 
@@ -72,10 +71,9 @@
         state: "{{ postgres_service_state | default('started') }}"
         enabled: "{{ postgres_service_enabled | default(true) }}"
 
-    - name: Configure Postgres resources, user, database etc 
+    - name: Configure Postgres resources, user, database etc
       block:
-
-        - name: Setup Postgres database(s) 
+        - name: Setup Postgres database(s)
           postgresql_db:
             name: "{{ __database.name }}"
             state: "{{ __database.state | default('present') }}"
@@ -83,7 +81,7 @@
           loop_control:
             loop_var: __database
 
-        - name: Create Postgres user#(s) 
+        - name: Create Postgres user#(s)
           postgresql_user:
             name: "{{ __user.name }}"
             password: "{{ __user.password | default(omit) }}"
@@ -95,13 +93,11 @@
           loop: "{{ postgres_users }}"
           loop_control:
             loop_var: __user
-          no_log: "{{ postgres_user_no_log_state | default(false) }}" 
-
+          no_log: "{{ postgres_user_no_log_state | default(false) }}"
 
       become_user: "{{ postgres_user }}"
 
   handlers:
-
     - name: restart_postgres
       service:
         name: "{{ postgres_service }}"
@@ -114,18 +110,17 @@
   tags:
     - application_servers
     - flask
-    
+
   vars:
     flask_app_name: resource_hub
     flask_user: flask
     flask_home: /opt/
-    flask_repo: https://github.com/tonykay/resource_hub.git  
-    flask_scm_ref: main  
-    flask_app_lauch_script: /usr/local/bin/launch_resource_hub   
-    virtualenv_name: "venv-{{ flask_app_name }}"  
+    flask_repo: https://github.com/tonykay/resource_hub.git
+    flask_scm_ref: main
+    flask_app_lauch_script: /usr/local/bin/launch_resource_hub
+    virtualenv_name: venv-{{ flask_app_name }}
     virtualenv_home: /opt/virtual_envs
     virtualenv_python: /usr/bin/python3
-      
 
     app_yum_packages:
       - autoconf
@@ -141,78 +136,76 @@
       - psycopg2-binary==2.8.6
 
   tasks:
-
     - name: Create flask user
       user:
         name: "{{ flask_user }}"
-        state: present  
+        state: present
 
     - name: Install flask packages
       package:
         name: "{{ __package }}"
         state: present
-      loop: "{{ app_yum_packages }}"        
+      loop: "{{ app_yum_packages }}"
       loop_control:
         loop_var: __package
 
-    - name: "Install flask repo {{ flask_repo }}"
+    - name: Install flask repo {{ flask_repo }}
       git:
         repo: "{{ flask_repo }}"
         dest: "{{ flask_home }}/{{ flask_app_name }}"
-        update: yes 
-        force: yes
+        update: true
+        force: true
       tags:
         - git
 
-    - name: "Change flash repo owner to {{ flask_user }} recursively"      
-      file: 
+    - name: Change flash repo owner to {{ flask_user }} recursively
+      file:
         dest: "{{ flask_home }}/{{ flask_app_name }}"
         owner: "{{ flask_user }}"
 
     - name: Virtualenv setup
       block:
-
         - name: Setup pre-requisite pip3 packages
           pip:
             name: "{{ pip_dependencies }}"
             state: latest
             executable: /usr/bin/pip3
 
-        - name: "Create virtualenv {{ virtualenv_name }} for Flask"
+        - name: Create virtualenv {{ virtualenv_name }} for Flask
           pip:
             requirements: "{{ flask_home }}/{{ flask_app_name }}/requirements.txt"
             virtualenv: "{{ virtualenv_home }}/{{ flask_app_name }}"
-            virtualenv_site_packages: no
+            virtualenv_site_packages: false
             virtualenv_command: /usr/local/bin/virtualenv
       tags:
         - venv
-        - virtualenv  
-          
+        - virtualenv
+
     - name: Initialize flask app database resources
       command: "{{ virtualenv_home }}/{{ flask_app_name }}/bin/python3 {{ flask_home }}/{{ flask_app_name }}/config.py"
       run_once: true
 
-    - name: "Generate {{ flask_app_name }} startup script"    
+    - name: Generate {{ flask_app_name }} startup script
       template:
         src: launch_resource_hub.j2
-        dest: /usr/local/bin/launch_resource_hub   
-        mode: '0555'
+        dest: /usr/local/bin/launch_resource_hub
+        mode: "0555"
 
     - name: template systemd service config
       template:
         src: flask_service.j2
         dest: /etc/systemd/system/{{ flask_app_name }}.service
-        mode: '0755'
+        mode: "0755"
 
     - name: start systemd app service
-      systemd: 
+      systemd:
         name: "{{ flask_app_name }}.service"
-        state: restarted 
-        enabled: yes
+        state: restarted
+        enabled: true
 
 - name: Deploy haproxy load balancer
   hosts: load_balancers
-  gather_facts: false 
+  gather_facts: false
   become: true
 
   vars:
@@ -223,7 +216,6 @@
     - load_balancers
 
   tasks:
-
     - name: Install load balancer packages
       package:
         name: "{{ load_balancer_packages }}"
@@ -242,7 +234,6 @@
         enabled: true
 
   handlers:
-
     - name: restart_haproxy
       service:
         name: haproxy
@@ -253,10 +244,9 @@
   gather_facts: true
   become: true
   tags:
-    - smoketest  
+    - smoketest
 
   tasks:
-
     - name: Smoketest Postgres database
       postgresql_ping:
         db: flask_db
@@ -274,13 +264,12 @@
   become: false
   gather_facts: false
   tags:
-    - smoketest  
+    - smoketest
   tasks:
- 
     - name: Check webserver for correct response
       uri:
-        url: "http://frontend1/ping"
-        return_content: yes
+        url: http://frontend1/ping
+        return_content: true
       until: '"alive" in result.content'
       retries: 10
       delay: 1
